@@ -1,6 +1,5 @@
 # verman - Go版本信息管理库
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/your-username/verman)](https://goreportcard.com/report/github.com/your-username/verman)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 verman是一个轻量级的Go语言版本信息管理库，用于在编译时注入和获取应用程序的版本信息。
