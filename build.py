@@ -327,10 +327,12 @@ def main():
     if args.output is None:
         # 如果使用简单文件名格式，则不包含系统架构信息
         if args.simple_name:
-            base_name = generate_output_file_name(BASE_OUTPUT_NAME, system)
+            base_name = f"{BASE_OUTPUT_NAME}"
         else:
             # 生成带有系统和架构信息的默认输出文件名
             base_name = f"{BASE_OUTPUT_NAME}_{system}_{architecture}"
+        
+        # 生成默认的输出文件名
         output_file = generate_output_file_name(base_name, system)
     else:
         # 如果指定了输出文件名，则使用指定的文件名
