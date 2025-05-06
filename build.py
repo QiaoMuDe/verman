@@ -247,25 +247,19 @@ def batch_build(args):
 
             print_success(f"正在构建 {system}/{architecture}...")
 
-            # 生成输出文件名
-            if args.output is None:
-                if args.simple_name:
-                    base_name = f"{BASE_OUTPUT_NAME}"
-                else:
-                    base_name = f"{BASE_OUTPUT_NAME}_{system}_{architecture}"
+            # 如果使用简单文件名格式，则生成输出文件名时不包含系统和架构信息
+            if args.simple_name:
+                base_name = f"{BASE_OUTPUT_NAME}"
                 output_file = generate_output_file_name(base_name, system)
             else:
-                output_file = args.output
+                base_name = f"{BASE_OUTPUT_NAME}_{system}_{architecture}"
+                output_file = generate_output_file_name(base_name, system)
 
             # 生成zip文件名
             if args.zip:
                 if args.zip_file is None:
                     zip_file = generate_zip_file_name(
-                        (
-                            BASE_OUTPUT_NAME
-                            if args.simple_name
-                            else f"{BASE_OUTPUT_NAME}_{system}_{architecture}"
-                        ),
+                        BASE_OUTPUT_NAME,
                         system,
                         architecture,
                     )
@@ -427,7 +421,7 @@ def parse_arguments():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description="构建 Go 应用程序")
     parser.add_argument(
-        "-o", "--output", help="指定输出文件名(无需指定后缀)", default=None
+        "-o", "--output", help="指定输出文件名(无需指定后缀)", default=BASE_OUTPUT_NAME
     )
     parser.add_argument(
         "-e", "--entry", help="指定入口文件路径", default=DEFAULT_ENTRY_FILE
@@ -571,20 +565,16 @@ def main():
     else:
         zip_file = args.zip_file
 
-    # 根据参数生成默认的输出文件名
-    if args.output is None:
-        # 如果使用简单文件名格式，则不包含系统架构信息
-        if args.simple_name:
-            base_name = f"{BASE_OUTPUT_NAME}"
-        else:
-            # 生成带有系统和架构信息的默认输出文件名
-            base_name = f"{BASE_OUTPUT_NAME}_{system}_{architecture}"
-
+    # 如果指定了简单文件名格式, 生成则生成不带系统架构信息的输出文件名
+    if args.simple_name:
+        base_name = f"{BASE_OUTPUT_NAME}"
         # 生成默认的输出文件名
         output_file = generate_output_file_name(base_name, system)
     else:
-        # 如果指定了输出文件名，则使用指定的文件名
-        output_file = args.output
+        # 生成带有系统和架构信息的默认输出文件名
+        base_name = f"{BASE_OUTPUT_NAME}_{system}_{architecture}"
+        # 生成默认的输出文件名
+        output_file = generate_output_file_name(base_name, system)
 
     # 验证文件路径
     if not os.path.exists(entry_file):
