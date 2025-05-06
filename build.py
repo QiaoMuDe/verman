@@ -11,6 +11,8 @@ import platform
 # 可根据实际情况修改区域 #
 # 基础输出文件名(指定时无需包含后缀)同时也是注入的appName
 BASE_OUTPUT_NAME = "myapp"
+# 默认输出目录
+DEFAULT_OUTPUT_DIR = "dst"
 # 默认入口文件的位置
 DEFAULT_ENTRY_FILE = "./main.go"
 # 默认的 Go 编译器，使用全局 PATH 中的 go
@@ -23,9 +25,29 @@ DEFAULT_USE_VENDOR_IN_BUILD = False
 DEFAULT_INJECT_GIT_INFO = True
 # 是否使用简单文件名格式，默认为True
 DEFAULT_SIMPLE_NAME = True
+# 是否将构建成功的可执行文件打包为zip文件，默认为False
+DEFAULT_PACKAGE_ZIP = False
 
 
 # 默认无需修改区域 #
+# 支持的平台列表
+SUPPORTED_PLATFORMS = ['windows', 'linux', 'darwin']
+# 平台简写映射
+PLATFORM_SHORTCUTS = {
+    'w': 'windows',
+    'l': 'linux',
+    'd': 'darwin'
+}
+# 支持的架构列表
+SUPPORTED_ARCHITECTURES = ['amd64', 'arm64', '386', 'arm', 'x86_64']
+# 架构简写映射
+ARCHITECTURE_SHORTCUTS = {
+    'a64': 'amd64',
+    'a32': '386',
+    'arm': 'arm',
+    'arm64': 'arm64'
+}
+
 # 定义颜色转义字符
 RED_BOLD = "\033[1;31m"  # 红色加粗
 GREEN_BOLD = "\033[1;32m"  # 绿色加粗
@@ -140,12 +162,44 @@ def build_go_app(go_compiler, output_file, entry_file, ldflags, use_vendor_in_bu
     """组装并执行构建命令"""
     command = [go_compiler, "build", "-o", output_file, "-ldflags", ldflags]
     if use_vendor_in_build:
+        # 检查 vendor 目录是否存在
+        if not os.path.exists("vendor"):
+            print_error("vendor 目录不存在，无法使用 -mod=vendor 选项。")
+            return False
         command.extend(["-mod=vendor"])
     command.append(entry_file)
     try:
-        # 使用指定的链接器标志进行构建
-        subprocess.run(command, capture_output=True, text=True, check=True)
-        print_success(f"构建成功，输出文件：{output_file}。")
+        # 强制设置环境变量
+        env = os.environ.copy()
+        # 从输出文件名中提取平台信息
+        if "_windows_" in output_file:
+            env["GOOS"] = "windows"
+        elif "_linux_" in output_file:
+            env["GOOS"] = "linux"
+        elif "_darwin_" in output_file:
+            env["GOOS"] = "darwin"
+        else:
+            env["GOOS"] = platform.system().lower()
+            
+        # 从输出文件名中提取架构信息
+        if "_amd64" in output_file:
+            env["GOARCH"] = "amd64"
+        elif "_arm64" in output_file:
+            env["GOARCH"] = "arm64"
+        elif "_386" in output_file:
+            env["GOARCH"] = "386"
+        elif "_arm" in output_file:
+            env["GOARCH"] = "arm"
+        else:
+            machine = platform.machine().lower()
+            # 自动转换x86_64为amd64
+            if machine == 'x86_64':
+                machine = 'amd64'
+            env["GOARCH"] = machine
+        
+        # 使用指定的链接器标志和环境变量进行构建
+        subprocess.run(command, capture_output=True, text=True, check=True, env=env)
+        print_success(f"构建成功，输出文件：{output_file}")
         return True
     except subprocess.CalledProcessError as e:
         print_error("构建失败：")
@@ -160,8 +214,124 @@ def zip_executable(output_file, zip_file):
         with zipfile.ZipFile(zip_file, "w", zipfile.ZIP_DEFLATED) as zipf:
             zipf.write(output_file)
         print_success(f"成功将 {output_file} 打包到 {zip_file} 中。")
+        
+        try:
+            os.remove(output_file)
+        except Exception as e:
+            print_error(f"删除源文件 {output_file} 失败: {str(e)}")
     except Exception as e:
         print_error(f"打包到 {zip_file} 失败：{str(e)}")
+
+
+def batch_build(args):
+    """批量构建所有支持的平台和架构组合"""
+    print_success("开始批量构建所有支持的平台和架构组合...")
+    total_start_time = time.time()
+    success_count = 0
+    fail_count = 0
+    
+    # 执行构建前的检查工作
+    print_success("开始检查构建环境...")
+    if not pre_build_checks(args.go_compiler, args.entry, args.use_vendor):
+        sys.exit(1)
+    
+    # 根据参数注入 Git 信息
+    if args.git:
+        print_success("获取 Git 信息...")
+        git_info = get_git_info()
+        if git_info is None:
+            sys.exit(1)
+    
+    # 创建临时args对象用于批量构建
+    batch_args = argparse.Namespace(**vars(args))
+    
+    for system in SUPPORTED_PLATFORMS:
+        for architecture in SUPPORTED_ARCHITECTURES:
+            # 跳过不支持的darwin/386和darwin/arm组合
+            if system == 'darwin' and architecture in ('386', 'arm'):
+                print_success(f"跳过不支持的架构组合: {system}/{architecture}")
+                continue
+                
+            batch_args.platform = system
+            batch_args.arch = architecture
+            
+            # 检查架构组合是否支持
+            if parse_arguments() is None:
+                continue
+                
+            print_success(f"正在构建 {system}/{architecture}...")
+            
+            # 生成输出文件名
+            if args.output is None:
+                if args.simple_name:
+                    base_name = f"{BASE_OUTPUT_NAME}"
+                else:
+                    base_name = f"{BASE_OUTPUT_NAME}_{system}_{architecture}"
+                output_file = generate_output_file_name(base_name, system)
+            else:
+                output_file = args.output
+            
+            # 生成zip文件名
+            if args.zip:
+                if args.zip_file is None:
+                    zip_file = generate_zip_file_name(BASE_OUTPUT_NAME if args.simple_name else f"{BASE_OUTPUT_NAME}_{system}_{architecture}", system, architecture)
+                else:
+                    zip_file = args.zip_file
+            else:
+                zip_file = None
+            
+            # 执行构建
+            build_result = single_build(args, system, architecture, output_file, zip_file)
+            
+            if build_result:
+                success_count += 1
+            else:
+                fail_count += 1
+    
+    total_elapsed_time = time.time() - total_start_time
+    print_success(f"批量构建完成，成功 {success_count} 个，失败 {fail_count} 个")
+    print_success(f"总耗时: {total_elapsed_time:.2f} 秒")
+
+
+def single_build(args, system, architecture, output_file, zip_file):
+    """执行单个平台和架构的构建"""
+    try:
+        # 设置环境变量
+        env = os.environ.copy()
+        env["GOOS"] = system
+        env["GOARCH"] = architecture
+        
+        # 获取构建时间
+        build_time = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        
+        # 处理Git信息
+        ldflags = args.ldflags
+        if args.git:
+            git_info = get_git_info()
+            if git_info is None:
+                return False
+            git_version, git_commit, format_time, git_status = git_info
+            ldflags = LD_FLAGS_TEMPLATE.format(
+                app_name=BASE_OUTPUT_NAME,
+                git_version=git_version,
+                git_commit=git_commit,
+                commit_time=format_time,
+                build_time=build_time,
+                tree_state=git_status,
+            )
+        
+        # 执行构建
+        build_result = build_go_app(
+            args.go_compiler, output_file, args.entry, ldflags, args.use_vendor_in_build
+        )
+        
+        if build_result and args.zip and zip_file:
+            zip_executable(output_file, zip_file)
+            
+        return build_result
+    except Exception as e:
+        print_error(f"构建 {system}/{architecture} 失败: {str(e)}")
+        return False
 
 
 def get_git_info():
@@ -212,14 +382,16 @@ def get_git_info():
 
 def generate_output_file_name(base_name, system):
     """根据操作系统生成默认输出文件名"""
+    os.makedirs(DEFAULT_OUTPUT_DIR, exist_ok=True)
     if system == "windows":
-        return f"{base_name}.exe"
-    return base_name
+        return os.path.join(DEFAULT_OUTPUT_DIR, f"{base_name}.exe")
+    return os.path.join(DEFAULT_OUTPUT_DIR, base_name)
 
 
 def generate_zip_file_name(output_base_name, system, architecture):
     """根据输出文件名、操作系统和架构生成默认的 zip 文件名"""
-    return f"{output_base_name}_{system}_{architecture}.zip"
+    os.makedirs(DEFAULT_OUTPUT_DIR, exist_ok=True)
+    return os.path.join(DEFAULT_OUTPUT_DIR, f"{output_base_name}_{system}_{architecture}.zip")
 
 
 def pre_build_checks(go_compiler, entry_file, use_vendor):
@@ -281,9 +453,15 @@ def parse_arguments():
         "--zip",
         action="store_true",
         help="是否将构建成功的可执行文件打包到 ZIP 文件中",
-        default=False,
+        default=DEFAULT_PACKAGE_ZIP,
     )
     parser.add_argument("--zip-file", help="指定打包输出的 ZIP 文件名", default=None)
+    parser.add_argument(
+        "--delete-after-zip",
+        action="store_true",
+        help="打包完成后删除源可执行文件",
+        default=False,
+    )
     parser.add_argument(
         "-git",
         action="store_true",
@@ -297,7 +475,39 @@ def parse_arguments():
         help="使用简单文件名格式(不包含系统架构信息)",
         default=DEFAULT_SIMPLE_NAME,
     )
+    parser.add_argument(
+        "-p",
+        "--platform",
+        help="指定目标平台(如linux/windows/darwin)",
+        default=None,
+    )
+    parser.add_argument(
+        "-a",
+        "--arch",
+        help="指定目标架构(如amd64/arm64)",
+        default=None,
+    )
+    parser.add_argument(
+        "-batch",
+        action="store_true",
+        help="启用批量构建模式，构建所有支持的平台和架构组合",
+        default=False,
+    )
     args = parser.parse_args()  # 解析命令行参数
+    
+    # 处理平台简写
+    if args.platform and args.platform in PLATFORM_SHORTCUTS:
+        args.platform = PLATFORM_SHORTCUTS[args.platform]
+        
+    # 处理架构简写
+    if args.arch and args.arch in ARCHITECTURE_SHORTCUTS:
+        args.arch = ARCHITECTURE_SHORTCUTS[args.arch]
+        
+    # 检查不支持的架构组合
+    if args.platform == 'darwin' and args.arch in ('386', 'arm'):
+        print_error(f'不支持的架构组合: darwin/{args.arch}, macOS不支持32位架构')
+        return None
+        
     return args
 
 
@@ -308,6 +518,11 @@ def main():
 
     # 解析命令行参数
     args = parse_arguments()
+    
+    # 如果是批量构建模式
+    if args.batch:
+        batch_build(args)
+        return
 
     entry_file = args.entry  # 指定入口文件路径
     ldflags = args.ldflags  # 指定构建时的链接器标志
@@ -318,8 +533,22 @@ def main():
     output_base_name = args.output  # 指定输出文件名
 
     # 获取操作系统和架构信息
-    system = platform.system().lower()
-    architecture = platform.machine().lower()
+    system = args.platform if args.platform else platform.system().lower()
+    architecture = args.arch if args.arch else platform.machine().lower()
+
+    # 自动转换x86_64为amd64
+    if architecture == 'x86_64':
+        architecture = 'amd64'
+    
+    # 校验平台和架构是否支持
+    if system not in SUPPORTED_PLATFORMS:
+        print_error(f'不支持的平台: {system}, 支持的平台: {SUPPORTED_PLATFORMS}')
+        print_error('支持的平台简写: ' + ', '.join([f"{k}({v})" for k, v in PLATFORM_SHORTCUTS.items()]))
+        sys.exit(1)
+    if architecture not in SUPPORTED_ARCHITECTURES:
+        print_error(f'不支持的架构: {architecture}, 支持的架构: {SUPPORTED_ARCHITECTURES}')
+        print_error('支持的架构简写: ' + ', '.join([f"{k}({v})" for k, v in ARCHITECTURE_SHORTCUTS.items()]))
+        sys.exit(1)
 
     # 生成默认的 zip 文件名
     if args.zip_file is None:
@@ -385,7 +614,7 @@ def main():
     if build_result:
         print_success("构建完成。")
         if zip_flag:
-            zip_executable(output_file, zip_file)
+            zip_executable(output_file, zip_file, args.delete_after_zip)
     else:
         print_error("构建失败，请检查错误信息。")
 
