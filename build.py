@@ -9,20 +9,16 @@ import platform
 
 
 # 可根据实际情况修改区域 #
-# 项目名称|包名，可根据实际情况修改(在注入git信息时会用到)
-PROJECT_NAME = "your_project_name"
-# 基础输出文件名(不带扩展名)
+# 基础输出文件名(指定时无需包含后缀)同时也是注入的appName
 BASE_OUTPUT_NAME = "myapp"
 # 默认入口文件的位置
 DEFAULT_ENTRY_FILE = "./main.go"
-# 默认构建时的链接器标志
-DEFAULT_LDFLAGS = "-s -w"
-# ldflags模板字符串
-LD_FLAGS_TEMPLATE = "-X 'gitee.com/MM-Q/verman.appName={app_name}' -X 'gitee.com/MM-Q/verman.gitVersion={git_version}' -X 'gitee.com/MM-Q/verman.gitCommit={git_commit}' -X 'gitee.com/MM-Q/verman.gitCommitTime={commit_time}' -X 'gitee.com/MM-Q/verman.buildTime={build_time}' -X 'gitee.com/MM-Q/verman.gitTreeState={tree_state}' -s -w"
 # 默认的 Go 编译器，使用全局 PATH 中的 go
 DEFAULT_GO_COMPILER = "go"
 # 默认不使用 vendor 克隆依赖
 DEFAULT_USE_VENDOR = False
+# 默认在构建阶段使用 vendor 目录
+DEFAULT_USE_VENDOR_IN_BUILD = False
 # 是否注入git信息，默认为True
 DEFAULT_INJECT_GIT_INFO = True
 # 是否使用简单文件名格式，默认为True
@@ -34,6 +30,10 @@ DEFAULT_SIMPLE_NAME = True
 RED_BOLD = "\033[1;31m"  # 红色加粗
 GREEN_BOLD = "\033[1;32m"  # 绿色加粗
 RESET = "\033[0m"  # 重置颜色
+# 默认构建时的链接器标志
+DEFAULT_LDFLAGS = "-s -w"
+# ldflags模板字符串
+LD_FLAGS_TEMPLATE = "-X 'gitee.com/MM-Q/verman.appName={app_name}' -X 'gitee.com/MM-Q/verman.gitVersion={git_version}' -X 'gitee.com/MM-Q/verman.gitCommit={git_commit}' -X 'gitee.com/MM-Q/verman.gitCommitTime={commit_time}' -X 'gitee.com/MM-Q/verman.buildTime={build_time}' -X 'gitee.com/MM-Q/verman.gitTreeState={tree_state}' -s -w"
 
 
 # 函数定义 #
@@ -136,10 +136,10 @@ def run_gofmt(go_compiler):
         sys.exit(1)
 
 
-def build_go_app(go_compiler, output_file, entry_file, ldflags, use_vendor):
+def build_go_app(go_compiler, output_file, entry_file, ldflags, use_vendor_in_build):
     """组装并执行构建命令"""
     command = [go_compiler, "build", "-o", output_file, "-ldflags", ldflags]
-    if use_vendor:
+    if use_vendor_in_build:
         command.extend(["-mod=vendor"])
     command.append(entry_file)
     try:
@@ -217,9 +217,9 @@ def generate_output_file_name(base_name, system):
     return base_name
 
 
-def generate_zip_file_name(project_name, system, architecture):
-    """根据项目名称、操作系统和架构生成默认的 zip 文件名"""
-    return f"{project_name}_{system}_{architecture}.zip"
+def generate_zip_file_name(output_base_name, system, architecture):
+    """根据输出文件名、操作系统和架构生成默认的 zip 文件名"""
+    return f"{output_base_name}_{system}_{architecture}.zip"
 
 
 def pre_build_checks(go_compiler, entry_file, use_vendor):
@@ -249,7 +249,7 @@ def pre_build_checks(go_compiler, entry_file, use_vendor):
 def parse_arguments():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description="构建 Go 应用程序")
-    parser.add_argument("-o", "--output", help="指定输出文件名", default=None)
+    parser.add_argument("-o", "--output", help="指定输出文件名(无需指定后缀)", default=None)
     parser.add_argument(
         "-e", "--entry", help="指定入口文件路径", default=DEFAULT_ENTRY_FILE
     )
@@ -270,14 +270,18 @@ def parse_arguments():
         default=DEFAULT_USE_VENDOR,
     )
     parser.add_argument(
+        "-b",
+        "--use-vendor-in-build",
+        action="store_true",
+        help="是否在构建阶段使用 vendor 目录",
+        default=DEFAULT_USE_VENDOR_IN_BUILD,
+    )
+    parser.add_argument(
         "-z",
         "--zip",
         action="store_true",
         help="是否将构建成功的可执行文件打包到 ZIP 文件中",
         default=False,
-    )
-    parser.add_argument(
-        "-p", "--project-name", help="指定项目名称", default=PROJECT_NAME
     )
     parser.add_argument("--zip-file", help="指定打包输出的 ZIP 文件名", default=None)
     parser.add_argument(
@@ -311,7 +315,7 @@ def main():
     use_vendor = args.use_vendor  # 是否通过 vendor 克隆依赖到项目目录下
     zip_flag = args.zip  # 是否将构建成功的可执行文件打包到 ZIP 文件中
     inject_git = args.git  # 是否注入 Git 信息
-    project_name = args.project_name  # 指定项目名称
+    output_base_name = args.output  # 指定输出文件名
 
     # 获取操作系统和架构信息
     system = platform.system().lower()
@@ -319,7 +323,7 @@ def main():
 
     # 生成默认的 zip 文件名
     if args.zip_file is None:
-        zip_file = generate_zip_file_name(project_name, system, architecture)
+        zip_file = generate_zip_file_name(output_base_name, system, architecture)
     else:
         zip_file = args.zip_file
 
@@ -359,21 +363,23 @@ def main():
         git_version, git_commit, format_time, git_status = git_info
         # 注入 Git 信息到链接器标志
         ldflags = LD_FLAGS_TEMPLATE.format(
-            app_name=project_name,
+            app_name=output_base_name,
             git_version=git_version,
             git_commit=git_commit,
             commit_time=format_time,
             build_time=build_time,
             tree_state=git_status,
         )
-        print_success(
-            f"注入 Git 信息: {git_version}, {git_commit}, {format_time}, {git_status}"
-        )
+        print_success(f"Git 版本: {git_version}")
+        print_success(f"Git 仓库状态: {git_status}")
+        print_success(f"Git 提交哈希值: {git_commit}")
+        print_success(f"Git 提交时间: {format_time}")
+        print_success(f"构建时间: {build_time}")
 
     # 执行构建命令
     print_success("开始构建...")
     build_result = build_go_app(
-        go_compiler, output_file, entry_file, ldflags, use_vendor
+        go_compiler, output_file, entry_file, ldflags, args.use_vendor_in_build
     )
 
     if build_result:
