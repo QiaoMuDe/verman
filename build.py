@@ -7,8 +7,7 @@ import zipfile
 from datetime import datetime, timezone
 import platform
 
-# Git信息缓存
-_git_info_cache = None
+############################### 以下为可配置的变量 #################################
 # 基础输出文件名(指定时无需包含后缀)同时也是注入的appName
 BASE_OUTPUT_NAME = "myapp"
 # 默认输出目录
@@ -27,6 +26,17 @@ DEFAULT_INJECT_GIT_INFO = True
 DEFAULT_SIMPLE_NAME = False
 # 是否将构建成功的可执行文件打包为zip文件, 默认为False
 DEFAULT_PACKAGE_ZIP = False
+####################################################################################
+
+
+############################### 以下为内部使用的变量 ###############################
+# Git信息缓存字典
+_git_info_cache = {
+    "version": None,
+    "commit": None,
+    "commit_time": None,
+    "status": None
+}
 # 支持的平台列表
 SUPPORTED_PLATFORMS = ["windows", "linux", "darwin"]
 # 平台简写映射
@@ -41,8 +51,9 @@ GREEN_BOLD = "\033[1;32m"  # 绿色加粗
 RESET = "\033[0m"  # 重置颜色
 # 默认构建时的链接器标志
 DEFAULT_LDFLAGS = "-s -w"
-# ldflags模板字符串
+# 启用git信息注入时的链接器标志模板
 LD_FLAGS_TEMPLATE = "-X 'gitee.com/MM-Q/verman.appName={app_name}' -X 'gitee.com/MM-Q/verman.gitVersion={git_version}' -X 'gitee.com/MM-Q/verman.gitCommit={git_commit}' -X 'gitee.com/MM-Q/verman.gitCommitTime={commit_time}' -X 'gitee.com/MM-Q/verman.buildTime={build_time}' -X 'gitee.com/MM-Q/verman.gitTreeState={tree_state}' -s -w"
+####################################################################################
 
 
 # 函数定义 #
@@ -223,9 +234,9 @@ def batch_build(args):
 
     # 根据参数注入 Git 信息
     if args.git:
-        print_success("获取 Git 信息...")
-        git_info = get_git_info()
-        if git_info is None:
+        print_success("正在获取 Git 信息...")
+        if _git_info_cache["version"] is None:
+            print_error("Git 信息获取失败，请检查 Git 环境是否正确配置。")
             sys.exit(1)
 
     # 创建临时args对象用于批量构建
@@ -250,19 +261,23 @@ def batch_build(args):
             # 如果使用简单文件名格式，则生成输出文件名时不包含系统和架构信息
             if args.simple_name:
                 base_name = f"{BASE_OUTPUT_NAME}"
-                output_file = generate_output_file_name(base_name, system)
+                git_version = _git_info_cache["version"] if args.git else None
+                output_file = generate_output_file_name(base_name, system, git_version)
             else:
                 base_name = f"{BASE_OUTPUT_NAME}_{system}_{architecture}"
-                output_file = generate_output_file_name(base_name, system)
+                git_version = _git_info_cache["version"] if args.git else None
+                output_file = generate_output_file_name(base_name, system, git_version)
 
             # 生成zip文件名
             if args.zip:
                 if args.zip_file is None:
+                    git_version = _git_info_cache["version"] if args.git else None
                     zip_file = generate_zip_file_name(
-                        BASE_OUTPUT_NAME,
-                        system,
-                        architecture,
-                    )
+                            BASE_OUTPUT_NAME,
+                            system,
+                            architecture,
+                            git_version
+                        )
                 else:
                     zip_file = args.zip_file
             else:
@@ -297,17 +312,15 @@ def single_build(args, system, architecture, output_file, zip_file):
         # 处理Git信息
         ldflags = args.ldflags
         if args.git:
-            git_info = get_git_info()
-            if git_info is None:
+            if _git_info_cache["version"] is None:
                 return False
-            git_version, git_commit, format_time, git_status = git_info
             ldflags = LD_FLAGS_TEMPLATE.format(
                 app_name=BASE_OUTPUT_NAME,
-                git_version=git_version,
-                git_commit=git_commit,
-                commit_time=format_time,
+                git_version=_git_info_cache["version"],
+                git_commit=_git_info_cache["commit"],
+                commit_time=_git_info_cache["commit_time"],
                 build_time=build_time,
-                tree_state=git_status,
+                tree_state=_git_info_cache["status"],
             )
 
         # 执行构建
@@ -327,70 +340,77 @@ def single_build(args, system, architecture, output_file, zip_file):
 def get_git_info():
     """获取 Git 版本信息"""
     global _git_info_cache
-
-    # 如果缓存存在则直接返回
-    if _git_info_cache is not None:
-        return _git_info_cache
-
-    try:
-        git_version = subprocess.run(
-            ["git", "describe", "--tags", "--always", "--dirty"],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=10,
-        ).stdout.strip()
-        git_commit = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=10,
-        ).stdout.strip()
-        git_commit_time = subprocess.run(
-            ["git", "log", "-1", "--format=%cd", "--date=iso"],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=10,
-        ).stdout.strip()
-        git_status = (
-            "dirty"
-            if subprocess.run(
-                ["git", "status", "--porcelain"],
+    
+    # 如果缓存不存在或无效，则尝试获取git信息
+    if _git_info_cache["version"] is None:
+        try:
+            git_version = subprocess.run(
+                ["git", "describe", "--tags", "--always", "--dirty"],
                 capture_output=True,
                 text=True,
+                check=True,
                 timeout=10,
             ).stdout.strip()
-            else "clean"
-        )
-        format_time = datetime.strptime(
-            git_commit_time, "%Y-%m-%d %H:%M:%S %z"
-        ).strftime("%Y-%m-%dT%H:%M:%SZ")
-        _git_info_cache = (git_version, git_commit, format_time, git_status)
-        return _git_info_cache
-    except subprocess.CalledProcessError:
-        print_error("警告: 无法获取 Git 版本信息，可能是当前目录不是 Git 仓库。")
-        return None
-    except subprocess.TimeoutExpired:
-        print_error("获取 Git 版本信息超时。")
-        return None
+            git_commit = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=10,
+            ).stdout.strip()
+            git_commit_time = subprocess.run(
+                ["git", "log", "-1", "--format=%cd", "--date=iso"],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=10,
+            ).stdout.strip()
+            git_status = (
+                "dirty"
+                if subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                ).stdout.strip()
+                else "clean"
+            )
+            format_time = datetime.strptime(
+                git_commit_time, "%Y-%m-%d %H:%M:%S %z"
+            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+            _git_info_cache["version"] = git_version
+            _git_info_cache["commit"] = git_commit
+            _git_info_cache["commit_time"] = format_time
+            _git_info_cache["status"] = git_status
+        except subprocess.CalledProcessError:
+            print_error("警告: 无法获取 Git 版本信息，可能是当前目录不是 Git 仓库。")
+            return None
+        except subprocess.TimeoutExpired:
+            print_error("获取 Git 版本信息超时。")
+            return None
+    
+    return (_git_info_cache["version"], _git_info_cache["commit"], 
+            _git_info_cache["commit_time"], _git_info_cache["status"])
 
 
-def generate_output_file_name(base_name, system):
-    """根据操作系统生成默认输出文件名"""
+def generate_output_file_name(base_name, system, git_version=None):
+    """根据操作系统生成默认输出文件名，可选的git版本号"""
     os.makedirs(DEFAULT_OUTPUT_DIR, exist_ok=True)
+    name = base_name
+    if git_version is not None:
+        name = f"{name}_{git_version}"
     if system == "windows":
-        return os.path.join(DEFAULT_OUTPUT_DIR, f"{base_name}.exe")
-    return os.path.join(DEFAULT_OUTPUT_DIR, base_name)
+        return os.path.join(DEFAULT_OUTPUT_DIR, f"{name}.exe")
+    return os.path.join(DEFAULT_OUTPUT_DIR, name)
 
 
-def generate_zip_file_name(output_base_name, system, architecture):
-    """根据输出文件名、操作系统和架构生成默认的 zip 文件名"""
+def generate_zip_file_name(output_base_name, system, architecture, git_version=None):
+    """根据输出文件名、操作系统和架构生成默认的 zip 文件名，可选的git版本号"""
     os.makedirs(DEFAULT_OUTPUT_DIR, exist_ok=True)
-    return os.path.join(
-        DEFAULT_OUTPUT_DIR, f"{output_base_name}_{system}_{architecture}.zip"
-    )
+    name = f"{output_base_name}_{system}_{architecture}"
+    if git_version is not None:
+        name = f"{name}_{git_version}"
+    return os.path.join(DEFAULT_OUTPUT_DIR, f"{name}.zip")
 
 
 def pre_build_checks(go_compiler, entry_file, use_vendor):
@@ -519,6 +539,11 @@ def main():
 
     # 解析命令行参数
     args = parse_arguments()
+    
+    # 如果启用了git标志，提前获取git信息
+    if args.git:
+        print_success("正在获取 Git 信息...")
+        get_git_info()
 
     # 如果是批量构建模式
     if args.batch:
@@ -558,24 +583,7 @@ def main():
             + ", ".join([f"{k}({v})" for k, v in ARCHITECTURE_SHORTCUTS.items()])
         )
         sys.exit(1)
-
-    # 生成默认的 zip 文件名
-    if args.zip_file is None:
-        zip_file = generate_zip_file_name(output_base_name, system, architecture)
-    else:
-        zip_file = args.zip_file
-
-    # 如果指定了简单文件名格式, 生成则生成不带系统架构信息的输出文件名
-    if args.simple_name:
-        base_name = f"{BASE_OUTPUT_NAME}"
-        # 生成默认的输出文件名
-        output_file = generate_output_file_name(base_name, system)
-    else:
-        # 生成带有系统和架构信息的默认输出文件名
-        base_name = f"{BASE_OUTPUT_NAME}_{system}_{architecture}"
-        # 生成默认的输出文件名
-        output_file = generate_output_file_name(base_name, system)
-
+        
     # 验证文件路径
     if not os.path.exists(entry_file):
         print_error(f"入口文件 {entry_file} 不存在")
@@ -584,18 +592,19 @@ def main():
     # 执行构建前的检查工作
     if not pre_build_checks(go_compiler, entry_file, use_vendor):
         sys.exit(1)
-
+        
     # 获取构建时间
     build_time = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
+    
     # 根据参数注入 Git 信息
     if inject_git:
-        print_success("获取 Git 信息...")
-        git_info = get_git_info()
-        if git_info is None:
+        # 直接从缓存获取git信息
+        git_version = _git_info_cache["version"]
+        git_commit = _git_info_cache["commit"]
+        format_time = _git_info_cache["commit_time"]
+        git_status = _git_info_cache["status"]
+        if git_version is None:
             sys.exit(1)
-        # 获取 Git 版本信息
-        git_version, git_commit, format_time, git_status = git_info
         # 注入 Git 信息到链接器标志
         ldflags = LD_FLAGS_TEMPLATE.format(
             app_name=output_base_name,
@@ -606,6 +615,23 @@ def main():
             tree_state=git_status,
         )
         print_success(f"Git信息已注入: {git_version} ({git_commit})")
+
+    # 生成默认的 zip 文件名
+    if args.zip_file is None:
+        zip_file = generate_zip_file_name(output_base_name, system, architecture, git_version if inject_git else None)
+    else:
+        zip_file = args.zip_file
+
+    # 如果指定了简单文件名格式, 生成则生成不带系统架构信息的输出文件名
+    if args.simple_name:
+        base_name = f"{BASE_OUTPUT_NAME}"
+        # 生成默认的输出文件名
+        output_file = generate_output_file_name(base_name, system, git_version if inject_git else None)
+    else:
+        # 生成带有系统和架构信息的默认输出文件名
+        base_name = f"{BASE_OUTPUT_NAME}_{system}_{architecture}"
+        # 生成默认的输出文件名
+        output_file = generate_output_file_name(base_name, system, git_version if inject_git else None)
 
     # 执行构建命令
     print_success("开始构建...")
