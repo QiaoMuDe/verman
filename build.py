@@ -41,12 +41,7 @@ DEFAULT_TIMEOUT = 1800
 
 ############################### 以下为内部使用的变量 ###############################
 # Git信息缓存字典
-_git_info_cache = {
-    "version": None,
-    "commit": None,
-    "commit_time": None,
-    "status": None
-}
+_git_info_cache = {"version": None, "commit": None, "commit_time": None, "status": None}
 # 支持的平台列表
 SUPPORTED_PLATFORMS = ["windows", "linux", "darwin"]
 # 平台简写映射
@@ -61,6 +56,11 @@ GREEN_BOLD = "\033[1;32m"  # 绿色加粗
 RESET = "\033[0m"  # 重置颜色
 # 默认构建时的链接器标志
 DEFAULT_LDFLAGS = "-s -w"
+# 默认环境变量字典
+DEFAULT_ENV_VARS = {
+    "GOPROXY": "https://goproxy.cn,https://goproxy.io,direct",  # Go 代理地址, 默认为 goproxy.cn 和 goproxy.io
+    "CGO_ENABLED": "0",  # 是否启用 CGO 编译, 0为禁用, 1为启用
+}
 # 启用git信息注入时的链接器标志模板
 LD_FLAGS_TEMPLATE = "-X 'gitee.com/MM-Q/verman.appName={app_name}' -X 'gitee.com/MM-Q/verman.gitVersion={git_version}' -X 'gitee.com/MM-Q/verman.gitCommit={git_commit}' -X 'gitee.com/MM-Q/verman.gitCommitTime={commit_time}' -X 'gitee.com/MM-Q/verman.buildTime={build_time}' -X 'gitee.com/MM-Q/verman.gitTreeState={tree_state}' -s -w"
 ####################################################################################
@@ -166,7 +166,9 @@ def run_gofmt(go_compiler):
         sys.exit(1)
 
 
-def build_go_app(go_compiler, output_file, entry_file, ldflags, use_vendor_in_build, is_batch=False):
+def build_go_app(
+    go_compiler, output_file, entry_file, ldflags, use_vendor_in_build, is_batch=False
+):
     """组装并执行构建命令"""
     command = [go_compiler, "build", "-o", output_file, "-ldflags", ldflags]
     if use_vendor_in_build:
@@ -179,6 +181,14 @@ def build_go_app(go_compiler, output_file, entry_file, ldflags, use_vendor_in_bu
     try:
         # 强制设置环境变量
         env = os.environ.copy()
+        # 添加默认环境变量
+        env.update(DEFAULT_ENV_VARS)
+        # 添加自定义环境变量
+        if hasattr(args, "env") and args.env:
+            for env_var in args.env:
+                if "=" in env_var:
+                    key, value = env_var.split("=", 1)
+                    env[key] = value
         # 从输出文件名中提取平台信息
         if "_windows_" in output_file:
             env["GOOS"] = "windows"
@@ -207,7 +217,7 @@ def build_go_app(go_compiler, output_file, entry_file, ldflags, use_vendor_in_bu
 
         # 使用指定的链接器标志和环境变量进行构建
         subprocess.run(command, capture_output=True, text=True, check=True, env=env)
-        
+
         if not is_batch:
             print_success(f"构建成功，输出文件：{output_file}")
         return True
@@ -231,6 +241,7 @@ def zip_executable(output_file, zip_file, is_batch=False):
             print_error(f"删除源文件 {output_file} 失败: {str(e)}")
     except Exception as e:
         print_error(f"打包到 {zip_file} 失败：{str(e)}")
+
 
 def batch_build(args):
     """批量构建所有支持的平台和架构组合"""
@@ -266,7 +277,7 @@ def batch_build(args):
                 skip_count += 1
                 print_success(f"跳过不支持的平台/架构组合: {system}/{architecture}")
             return
-            
+
         # 如果启用了仅构建当前平台且平台不一致则跳过
         if args.current_platform_only and system != platform.system().lower():
             with lock:
@@ -296,11 +307,8 @@ def batch_build(args):
             if args.zip_file is None:
                 git_version = _git_info_cache["version"] if args.git else None
                 zip_file = generate_zip_file_name(
-                        BASE_OUTPUT_NAME,
-                        system,
-                        architecture,
-                        git_version
-                    )
+                    BASE_OUTPUT_NAME, system, architecture, git_version
+                )
             else:
                 zip_file = args.zip_file
         else:
@@ -311,20 +319,24 @@ def batch_build(args):
             build_result = single_build(
                 args, system, architecture, output_file, zip_file
             )
-            
+
             with lock:
                 if build_result:
                     success_count += 1
                 else:
                     fail_count += 1
                 completed_count = success_count + fail_count
-                print_success(f"已完成 {completed_count}/{total_tasks} 个任务 (成功 {success_count} 个，失败 {fail_count} 个，跳过 {skip_count} 个)")
+                print_success(
+                    f"已完成 {completed_count}/{total_tasks} 个任务 (成功 {success_count} 个，失败 {fail_count} 个，跳过 {skip_count} 个)"
+                )
                 pass
         except Exception as e:
             with lock:
                 fail_count += 1
                 completed_count = success_count + fail_count
-                print_success(f"已完成 {completed_count}/{total_tasks} 个任务 (成功 {success_count} 个，失败 {fail_count} 个，跳过 {skip_count} 个)")
+                print_success(
+                    f"已完成 {completed_count}/{total_tasks} 个任务 (成功 {success_count} 个，失败 {fail_count} 个，跳过 {skip_count} 个)"
+                )
                 print_error(f"构建 {system}/{architecture} 时发生异常: {str(e)}")
 
     # 创建线程池
@@ -334,7 +346,7 @@ def batch_build(args):
         for system in SUPPORTED_PLATFORMS:
             for architecture in SUPPORTED_ARCHITECTURES:
                 futures.append(executor.submit(build_task, system, architecture))
-        
+
         # 等待所有任务完成，设置超时时间为30分钟
         try:
             for future in futures:
@@ -344,9 +356,11 @@ def batch_build(args):
             executor._threads.clear()
             concurrent.futures.thread._threads_queues.clear()
             fail_count += len([f for f in futures if not f.done()])
-            
+
     total_elapsed_time = time.time() - total_start_time
-    print_success(f"批量构建完成，成功 {success_count} 个，失败 {fail_count} 个，跳过 {skip_count} 个")
+    print_success(
+        f"批量构建完成，成功 {success_count} 个，失败 {fail_count} 个，跳过 {skip_count} 个"
+    )
     print_success(f"总耗时: {total_elapsed_time:.2f} 秒")
 
 
@@ -377,7 +391,12 @@ def single_build(args, system, architecture, output_file, zip_file):
 
         # 执行构建
         build_result = build_go_app(
-            args.go_compiler, output_file, args.entry, ldflags, args.use_vendor_in_build, True
+            args.go_compiler,
+            output_file,
+            args.entry,
+            ldflags,
+            args.use_vendor_in_build,
+            True,
         )
 
         if build_result and args.zip and zip_file:
@@ -392,7 +411,7 @@ def single_build(args, system, architecture, output_file, zip_file):
 def get_git_info():
     """获取 Git 版本信息"""
     global _git_info_cache
-    
+
     # 如果缓存不存在或无效，则尝试获取git信息
     if _git_info_cache["version"] is None:
         try:
@@ -440,9 +459,13 @@ def get_git_info():
         except subprocess.TimeoutExpired:
             print_error("获取 Git 版本信息超时。")
             return None
-    
-    return (_git_info_cache["version"], _git_info_cache["commit"], 
-            _git_info_cache["commit_time"], _git_info_cache["status"])
+
+    return (
+        _git_info_cache["version"],
+        _git_info_cache["commit"],
+        _git_info_cache["commit_time"],
+        _git_info_cache["status"],
+    )
 
 
 def generate_output_file_name(base_name, system, git_version=None):
@@ -492,6 +515,12 @@ def pre_build_checks(go_compiler, entry_file, use_vendor):
 def parse_arguments():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description="构建 Go 应用程序")
+    parser.add_argument(
+        "-e",
+        "--env",
+        action="append",
+        help="添加自定义环境变量，格式为KEY=VALUE，可多次使用",
+    )
     parser.add_argument(
         "-o", "--output", help="指定输出文件名(无需指定后缀)", default=BASE_OUTPUT_NAME
     )
@@ -606,12 +635,12 @@ def main():
 
     # 解析命令行参数
     args = parse_arguments()
-    
+
     # 检查批量构建模式下是否启用了简单文件名格式
     if args.batch and args.simple_name:
         print_error("批量构建模式下不能使用简单文件名格式，请移除-s/--simple-name参数")
         return None
-    
+
     # 如果启用了git标志，提前获取git信息
     if args.git:
         print_success("正在获取 Git 信息...")
@@ -633,10 +662,12 @@ def main():
     # 获取操作系统和架构信息
     system = args.platform if args.platform else platform.system().lower()
     architecture = args.arch if args.arch else platform.machine().lower()
-    
+
     # 检查是否仅构建当前平台
     if args.current_platform_only and system != platform.system().lower():
-        print_error(f"当前平台为 {platform.system().lower()}, 不允许构建 {system} 平台的可执行文件")
+        print_error(
+            f"当前平台为 {platform.system().lower()}, 不允许构建 {system} 平台的可执行文件"
+        )
         sys.exit(1)
 
     # 自动转换x86_64为amd64
@@ -660,7 +691,7 @@ def main():
             + ", ".join([f"{k}({v})" for k, v in ARCHITECTURE_SHORTCUTS.items()])
         )
         sys.exit(1)
-        
+
     # 验证文件路径
     if not os.path.exists(entry_file):
         print_error(f"入口文件 {entry_file} 不存在")
@@ -669,10 +700,10 @@ def main():
     # 执行构建前的检查工作
     if not pre_build_checks(go_compiler, entry_file, use_vendor):
         sys.exit(1)
-        
+
     # 获取构建时间
     build_time = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    
+
     # 根据参数注入 Git 信息
     if inject_git:
         # 直接从缓存获取git信息
@@ -695,7 +726,9 @@ def main():
 
     # 生成默认的 zip 文件名
     if args.zip_file is None:
-        zip_file = generate_zip_file_name(output_base_name, system, architecture, git_version if inject_git else None)
+        zip_file = generate_zip_file_name(
+            output_base_name, system, architecture, git_version if inject_git else None
+        )
     else:
         zip_file = args.zip_file
 
@@ -703,17 +736,26 @@ def main():
     if args.simple_name:
         base_name = f"{BASE_OUTPUT_NAME}"
         # 生成默认的输出文件名
-        output_file = generate_output_file_name(base_name, system, git_version if inject_git else None)
+        output_file = generate_output_file_name(
+            base_name, system, git_version if inject_git else None
+        )
     else:
         # 生成带有系统和架构信息的默认输出文件名
         base_name = f"{BASE_OUTPUT_NAME}_{system}_{architecture}"
         # 生成默认的输出文件名
-        output_file = generate_output_file_name(base_name, system, git_version if inject_git else None)
+        output_file = generate_output_file_name(
+            base_name, system, git_version if inject_git else None
+        )
 
     # 执行构建命令
     print_success("开始构建...")
     build_result = build_go_app(
-        go_compiler, output_file, entry_file, ldflags, args.use_vendor_in_build, args.batch
+        go_compiler,
+        output_file,
+        entry_file,
+        ldflags,
+        args.use_vendor_in_build,
+        args.batch,
     )
 
     if build_result:
