@@ -28,6 +28,8 @@ DEFAULT_USE_VENDOR_IN_BUILD = False
 DEFAULT_INJECT_GIT_INFO = True
 # 是否使用简单文件名格式, 默认为False
 DEFAULT_SIMPLE_NAME = False
+# 是否仅构建当前平台, 默认为False
+DEFAULT_CURRENT_PLATFORM_ONLY = False
 # 是否将构建成功的可执行文件打包为zip文件, 默认为False
 DEFAULT_PACKAGE_ZIP = False
 # 批量构建时默认的并发线程数
@@ -264,6 +266,13 @@ def batch_build(args):
                 skip_count += 1
                 print_success(f"跳过不支持的平台/架构组合: {system}/{architecture}")
             return
+            
+        # 如果启用了仅构建当前平台且平台不一致则跳过
+        if args.current_platform_only and system != platform.system().lower():
+            with lock:
+                skip_count += 1
+                print_success(f"跳过非当前平台: {system}/{architecture}")
+            return
 
         batch_args.platform = system
         batch_args.arch = architecture
@@ -309,13 +318,13 @@ def batch_build(args):
                 else:
                     fail_count += 1
                 completed_count = success_count + fail_count
-                print_success(f"已完成 {completed_count}/{total_tasks} 个任务 (成功 {success_count} 个，失败 {fail_count} 个)")
+                print_success(f"已完成 {completed_count}/{total_tasks} 个任务 (成功 {success_count} 个，失败 {fail_count} 个，跳过 {skip_count} 个)")
                 pass
         except Exception as e:
             with lock:
                 fail_count += 1
                 completed_count = success_count + fail_count
-                print_success(f"已完成 {completed_count}/{total_tasks} 个任务 (成功 {success_count} 个，失败 {fail_count} 个)")
+                print_success(f"已完成 {completed_count}/{total_tasks} 个任务 (成功 {success_count} 个，失败 {fail_count} 个，跳过 {skip_count} 个)")
                 print_error(f"构建 {system}/{architecture} 时发生异常: {str(e)}")
 
     # 创建线程池
@@ -527,6 +536,13 @@ def parse_arguments():
         default=DEFAULT_INJECT_GIT_INFO,
     )
     parser.add_argument(
+        "-c",
+        "--current-platform-only",
+        action="store_true",
+        help="仅构建当前运行平台的可执行文件",
+        default=DEFAULT_CURRENT_PLATFORM_ONLY,
+    )
+    parser.add_argument(
         "-s",
         "--simple-name",
         action="store_true",
@@ -617,6 +633,11 @@ def main():
     # 获取操作系统和架构信息
     system = args.platform if args.platform else platform.system().lower()
     architecture = args.arch if args.arch else platform.machine().lower()
+    
+    # 检查是否仅构建当前平台
+    if args.current_platform_only and system != platform.system().lower():
+        print_error(f"当前平台为 {platform.system().lower()}, 不允许构建 {system} 平台的可执行文件")
+        sys.exit(1)
 
     # 自动转换x86_64为amd64
     if architecture == "x86_64":
