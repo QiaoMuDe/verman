@@ -47,9 +47,9 @@ SUPPORTED_PLATFORMS = ["windows", "linux", "darwin"]
 # 平台简写映射
 PLATFORM_SHORTCUTS = {"w": "windows", "l": "linux", "d": "darwin"}
 # 支持的架构列表
-SUPPORTED_ARCHITECTURES = ["amd64", "arm64", "386", "arm", "x86_64"]
+SUPPORTED_ARCHITECTURES = ["amd64"]
 # 架构简写映射
-ARCHITECTURE_SHORTCUTS = {"a64": "amd64", "a32": "386", "arm": "arm", "arm64": "arm64"}
+ARCHITECTURE_SHORTCUTS = {"a64": "amd64"}
 # 定义颜色转义字符
 RED_BOLD = "\033[1;31m"  # 红色加粗
 GREEN_BOLD = "\033[1;32m"  # 绿色加粗
@@ -60,6 +60,8 @@ DEFAULT_LDFLAGS = "-s -w"
 DEFAULT_ENV_VARS = {
     "GOPROXY": "https://goproxy.cn,https://goproxy.io,direct",  # Go 代理地址, 默认为 goproxy.cn 和 goproxy.io
     "CGO_ENABLED": "0",  # 是否启用 CGO 编译, 0为禁用, 1为启用
+    "CC": "gcc",  # 默认使用gcc编译器
+    "CXX": "g++",  # 默认使用g++编译器
 }
 # 启用git信息注入时的链接器标志模板
 LD_FLAGS_TEMPLATE = "-X 'gitee.com/MM-Q/verman.appName={app_name}' -X 'gitee.com/MM-Q/verman.gitVersion={git_version}' -X 'gitee.com/MM-Q/verman.gitCommit={git_commit}' -X 'gitee.com/MM-Q/verman.gitCommitTime={commit_time}' -X 'gitee.com/MM-Q/verman.buildTime={build_time}' -X 'gitee.com/MM-Q/verman.gitTreeState={tree_state}' -s -w"
@@ -167,7 +169,7 @@ def run_gofmt(go_compiler):
 
 
 def build_go_app(
-    go_compiler, output_file, entry_file, ldflags, use_vendor_in_build, is_batch=False
+    go_compiler, output_file, entry_file, ldflags, use_vendor_in_build, is_batch=False, args=None
 ):
     """组装并执行构建命令"""
     command = [go_compiler, "build", "-o", output_file, "-ldflags", ldflags]
@@ -183,8 +185,13 @@ def build_go_app(
         env = os.environ.copy()
         # 添加默认环境变量
         env.update(DEFAULT_ENV_VARS)
+        
+        # 为arm64架构设置特定的交叉编译工具链
+        if env.get("GOARCH") == "arm64":
+            env["CC"] = "aarch64-linux-gnu-gcc"
+            env["CXX"] = "aarch64-linux-gnu-g++"
         # 添加自定义环境变量
-        if hasattr(args, "env") and args.env:
+        if args and hasattr(args, "env") and args.env:
             for env_var in args.env:
                 if "=" in env_var:
                     key, value = env_var.split("=", 1)
@@ -516,10 +523,10 @@ def parse_arguments():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description="构建 Go 应用程序")
     parser.add_argument(
-        "-e",
+        "-env",
         "--env",
         action="append",
-        help="添加自定义环境变量，格式为KEY=VALUE，可多次使用",
+        help="添加自定义环境变量, 格式为KEY=VALUE, 可多次使用, 例如: --env KEY=VALUE",
     )
     parser.add_argument(
         "-o", "--output", help="指定输出文件名(无需指定后缀)", default=BASE_OUTPUT_NAME
