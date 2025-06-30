@@ -36,6 +36,13 @@ DEFAULT_PACKAGE_ZIP = False
 DEFAULT_CONCURRENCY = 4
 # 批量构建时默认的超时时间(秒)
 DEFAULT_TIMEOUT = 1800
+# 默认环境变量字典
+DEFAULT_ENV_VARS = {
+    "GOPROXY": "https://goproxy.cn,https://goproxy.io,direct",  # Go 代理地址, 默认为 goproxy.cn 和 goproxy.io
+    "CGO_ENABLED": "0",  # 是否启用 CGO 编译, 0为禁用, 1为启用
+    "CC": "gcc",  # 默认使用gcc编译器
+    "CXX": "g++",  # 默认使用g++编译器
+}
 ####################################################################################
 
 
@@ -56,13 +63,6 @@ GREEN_BOLD = "\033[1;32m"  # 绿色加粗
 RESET = "\033[0m"  # 重置颜色
 # 默认构建时的链接器标志
 DEFAULT_LDFLAGS = "-s -w"
-# 默认环境变量字典
-DEFAULT_ENV_VARS = {
-    "GOPROXY": "https://goproxy.cn,https://goproxy.io,direct",  # Go 代理地址, 默认为 goproxy.cn 和 goproxy.io
-    "CGO_ENABLED": "0",  # 是否启用 CGO 编译, 0为禁用, 1为启用
-    "CC": "gcc",  # 默认使用gcc编译器
-    "CXX": "g++",  # 默认使用g++编译器
-}
 # 启用git信息注入时的链接器标志模板
 LD_FLAGS_TEMPLATE = "-X 'gitee.com/MM-Q/verman.appName={app_name}' -X 'gitee.com/MM-Q/verman.gitVersion={git_version}' -X 'gitee.com/MM-Q/verman.gitCommit={git_commit}' -X 'gitee.com/MM-Q/verman.gitCommitTime={commit_time}' -X 'gitee.com/MM-Q/verman.buildTime={build_time}' -X 'gitee.com/MM-Q/verman.gitTreeState={tree_state}' -s -w"
 ####################################################################################
