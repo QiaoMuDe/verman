@@ -37,7 +37,7 @@ func TestGetVersionInfo(t *testing.T) {
 			// 调用 Get 函数获取当前的版本信息。
 			got := verman.Get()
 			// 比较获取到的版本信息与期望的版本信息是否一致。
-			if got != tt.want {
+			if *got != tt.want {
 				// 如果不一致，输出错误信息。
 				t.Errorf("Get() = %v, want %v", got, tt.want)
 			}
