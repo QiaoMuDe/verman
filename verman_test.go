@@ -22,63 +22,63 @@ func TestAllFormats(t *testing.T) {
 	fmt.Println("=== 版本信息格式展示 ===")
 	fmt.Println()
 
-	// 1. Simple 格式
-	fmt.Println("1. Simple() - 简洁格式:")
-	fmt.Printf("%s\n", info.Simple())
+	// 1. Short 格式
+	fmt.Println("1. Short() - 极简格式:")
+	fmt.Printf("%s\n", info.Short())
 	fmt.Println()
 	fmt.Println()
 
-	// 2. Version 格式
-	fmt.Println("2. Version() - 标准版本格式:")
-	fmt.Printf("%s\n", info.Version())
+	// 2. Standard 格式
+	fmt.Println("2. Standard() - 标准格式:")
+	fmt.Printf("%s\n", info.Standard())
 	fmt.Println()
 	fmt.Println()
 
 	// 3. Full 格式
-	fmt.Println("3. Full() - 完整版本格式:")
+	fmt.Println("3. Full() - 完整格式:")
 	fmt.Printf("%s\n", info.Full())
 	fmt.Println()
 	fmt.Println()
 
-	// 4. Detail 格式
-	fmt.Println("4. Detail() - 详细信息格式:")
-	fmt.Printf("%s\n", info.Detail())
+	// 4. Lines 格式
+	fmt.Println("4. Lines() - 分行格式:")
+	fmt.Printf("%s\n", info.Lines())
 	fmt.Println()
 	fmt.Println()
 
-	// 5. Complete 格式
-	fmt.Println("5. Complete() - 完整信息格式:")
-	fmt.Printf("%s\n", info.Complete())
-	fmt.Println()
-	fmt.Println()
-
-	// 6. Banner 格式 (多行)
-	fmt.Println("6. Banner() - 横幅格式 (多行):")
-	fmt.Printf("%s\n", info.Banner())
-	fmt.Println()
-	fmt.Println()
-
-	// 7. Build 格式 (多行)
-	fmt.Println("7. Build() - 构建信息格式 (多行):")
-	fmt.Printf("%s\n", info.Build())
-	fmt.Println()
-	fmt.Println()
-
-	// 8. Git 格式 (多行)
-	fmt.Println("8. Git() - Git信息格式 (多行):")
-	fmt.Printf("%s\n", info.Git())
-	fmt.Println()
-	fmt.Println()
-
-	// 9. Table 格式 (多行)
-	fmt.Println("9. Table() - 表格格式 (多行):")
+	// 5. Table 格式
+	fmt.Println("5. Table() - 表格格式:")
 	fmt.Printf("%s\n", info.Table())
 	fmt.Println()
 	fmt.Println()
 
-	// 10. JSON 格式 (多行)
-	fmt.Println("10. JSON() - JSON格式 (多行):")
+	// 6. JSON 格式
+	fmt.Println("6. JSON() - JSON格式:")
 	fmt.Printf("%s\n", info.JSON())
+	fmt.Println()
+	fmt.Println()
+
+	// 7. KV 格式
+	fmt.Println("7. KV() - 键值对格式:")
+	fmt.Printf("%s\n", info.KV())
+	fmt.Println()
+	fmt.Println()
+
+	// 8. Banner 格式
+	fmt.Println("8. Banner() - 横幅格式:")
+	fmt.Printf("%s\n", info.Banner())
+	fmt.Println()
+	fmt.Println()
+
+	// 9. CSV 格式
+	fmt.Println("9. CSV() - 逗号分隔格式:")
+	fmt.Printf("%s\n", info.CSV())
+	fmt.Println()
+	fmt.Println()
+
+	// 10. URI 格式
+	fmt.Println("10. URI() - URI格式:")
+	fmt.Printf("%s\n", info.URI())
 	fmt.Println()
 	fmt.Println()
 
@@ -86,16 +86,16 @@ func TestAllFormats(t *testing.T) {
 
 	// 验证所有方法都返回非空字符串
 	formats := map[string]string{
-		"Simple":   info.Simple(),
-		"Version":  info.Version(),
+		"Short":    info.Short(),
+		"Standard": info.Standard(),
 		"Full":     info.Full(),
-		"Detail":   info.Detail(),
-		"Complete": info.Complete(),
-		"Banner":   info.Banner(),
-		"Build":    info.Build(),
-		"Git":      info.Git(),
+		"Lines":    info.Lines(),
 		"Table":    info.Table(),
 		"JSON":     info.JSON(),
+		"KV":       info.KV(),
+		"Banner":   info.Banner(),
+		"CSV":      info.CSV(),
+		"URI":      info.URI(),
 	}
 
 	for name, result := range formats {
@@ -122,8 +122,8 @@ func TestGlobalInstance(t *testing.T) {
 	fmt.Println()
 
 	fmt.Println("使用全局实例 V 调用方法:")
-	fmt.Printf("V.Simple(): %s\n", V.Simple())
-	fmt.Printf("V.Version(): %s\n", V.Version())
+	fmt.Printf("V.Short(): %s\n", V.Short())
+	fmt.Printf("V.Standard(): %s\n", V.Standard())
 	fmt.Println()
 }
 
@@ -134,8 +134,8 @@ func TestEdgeCases(t *testing.T) {
 
 	fmt.Println("=== 边界情况测试 ===")
 	fmt.Println("空 Info 结构体的输出:")
-	fmt.Printf("Simple(): '%s'\n", emptyInfo.Simple())
-	fmt.Printf("Version(): '%s'\n", emptyInfo.Version())
+	fmt.Printf("Short(): '%s'\n", emptyInfo.Short())
+	fmt.Printf("Standard(): '%s'\n", emptyInfo.Standard())
 	fmt.Println()
 
 	// 测试部分字段为空的情况
@@ -146,7 +146,7 @@ func TestEdgeCases(t *testing.T) {
 	}
 
 	fmt.Println("部分字段填充的 Info 结构体:")
-	fmt.Printf("Simple(): %s\n", partialInfo.Simple())
+	fmt.Printf("Short(): %s\n", partialInfo.Short())
 	fmt.Printf("Full(): %s\n", partialInfo.Full())
 	fmt.Printf("Table():\n%s\n", partialInfo.Table())
 }
@@ -164,21 +164,21 @@ func BenchmarkAllMethods(b *testing.B) {
 		Platform:      "linux/amd64",
 	}
 
-	b.Run("Simple", func(b *testing.B) {
+	b.Run("Short", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			info.Simple()
+			info.Short()
 		}
 	})
 
-	b.Run("Version", func(b *testing.B) {
+	b.Run("Standard", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			info.Version()
+			info.Standard()
 		}
 	})
 
-	b.Run("Complete", func(b *testing.B) {
+	b.Run("Full", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			info.Complete()
+			info.Full()
 		}
 	})
 

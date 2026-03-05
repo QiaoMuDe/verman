@@ -37,31 +37,15 @@ V 全局版本信息实例，供外部使用
 func (i *Info) Banner() string
 ```
 
-Banner 返回横幅格式(多行)
+Banner 返回横幅格式
 
-#### func (*Info) Build
-
-```go
-func (i *Info) Build() string
-```
-
-Build 返回构建信息格式
-
-#### func (*Info) Complete
+#### func (*Info) CSV
 
 ```go
-func (i *Info) Complete() string
+func (i *Info) CSV() string
 ```
 
-Complete 返回包含所有信息的完整字符串"程序名 v1.0.0 linux/amd64 (commit: abc1234, tree: clean, built: 2024-01-01T12:00:00Z, go: go1.19)"
-
-#### func (*Info) Detail
-
-```go
-func (i *Info) Detail() string
-```
-
-Detail 返回格式为"程序名 v1.0.0 linux/amd64 built at 2024-01-01"的字符串
+CSV 返回逗号分隔格式
 
 #### func (*Info) Full
 
@@ -69,15 +53,7 @@ Detail 返回格式为"程序名 v1.0.0 linux/amd64 built at 2024-01-01"的字�
 func (i *Info) Full() string
 ```
 
-Full 返回格式为"程序名 version 版本号 平台/架构 (commit: abc1234)"的字符串
-
-#### func (*Info) Git
-
-```go
-func (i *Info) Git() string
-```
-
-Git 返回Git信息格式
+Full 返回完整格式
 
 #### func (*Info) JSON
 
@@ -87,13 +63,45 @@ func (i *Info) JSON() string
 
 JSON 返回JSON格式
 
-#### func (*Info) Simple
+#### func (*Info) KV
 
 ```go
-func (i *Info) Simple() string
+func (i *Info) KV() string
 ```
 
-Simple 返回格式为"程序名 v1.0.0"的字符串
+KV 返回键值对格式
+
+#### func (*Info) Lines
+
+```go
+func (i *Info) Lines() string
+```
+
+Lines 返回分行格式
+
+#### func (*Info) Long
+
+```go
+func (i *Info) Long() string
+```
+
+Long 返回长格式
+
+#### func (*Info) Short
+
+```go
+func (i *Info) Short() string
+```
+
+Short 返回短格式
+
+#### func (*Info) Standard
+
+```go
+func (i *Info) Standard() string
+```
+
+Standard 返回标准格式
 
 #### func (*Info) Table
 
@@ -101,7 +109,15 @@ Simple 返回格式为"程序名 v1.0.0"的字符串
 func (i *Info) Table() string
 ```
 
-Table 返回表格格式(多行)
+Table 返回表格格式
+
+#### func (*Info) URI
+
+```go
+func (i *Info) URI() string
+```
+
+URI 返回URI格式
 
 #### func (*Info) Version
 

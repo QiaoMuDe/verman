@@ -11,14 +11,14 @@
 
 > 🎯 **轻量级 Go 版本信息管理库** - 专为简化应用程序版本管理而设计的现代化解决方案
 
-verman 是一个功能强大且易于使用的 Go 语言版本信息管理库，支持编译时注入版本信息，提供 **10 种不同格式** 的版本输出，帮助开发者轻松管理和展示应用版本信息。
+verman 是一个功能强大且易于使用的 Go 语言版本信息管理库，支持编译时注入版本信息，提供 **12 种不同格式** 的版本输出，帮助开发者轻松管理和展示应用版本信息。
 
 ---
 
 ## ✨ 核心特性
 
 - 🔧 **编译时注入** - 支持通过 `-ldflags` 在编译时注入版本信息
-- 📊 **丰富输出格式** - 提供 **10 种不同** 的版本信息输出格式
+- 📊 **丰富输出格式** - 提供 **12 种不同** 的版本信息输出格式
 - 🌐 **运行时信息** - 自动获取 Go 版本和平台信息
 - 🎨 **简洁 API** - 通过全局实例 `V` 调用，无需构造函数
 - 🚀 **零依赖** - 仅使用 Go 标准库，轻量级设计
@@ -55,8 +55,8 @@ import (
 func main() {
     // 使用全局实例 V 调用方法
     fmt.Println("版本信息:", verman.V.Version())
-    fmt.Println("简洁格式:", verman.V.Simple())
-    fmt.Println("完整信息:", verman.V.Complete())
+    fmt.Println("短格式:", verman.V.Short())
+    fmt.Println("完整信息:", verman.V.Full())
     
     // 多行格式展示
     fmt.Println("横幅格式:")
@@ -100,24 +100,28 @@ func main() {
 
     if *showVersion {
         switch *format {
-        case "simple":
-            fmt.Println(verman.V.Simple())
+        case "short":
+            fmt.Println(verman.V.Short())
+        case "long":
+            fmt.Println(verman.V.Long())
+        case "standard":
+            fmt.Println(verman.V.Standard())
         case "full":
             fmt.Println(verman.V.Full())
-        case "detail":
-            fmt.Println(verman.V.Detail())
-        case "complete":
-            fmt.Println(verman.V.Complete())
-        case "banner":
-            fmt.Println(verman.V.Banner())
+        case "lines":
+            fmt.Println(verman.V.Lines())
         case "table":
             fmt.Println(verman.V.Table())
         case "json":
             fmt.Println(verman.V.JSON())
-        case "git":
-            fmt.Println(verman.V.Git())
-        case "build":
-            fmt.Println(verman.V.Build())
+        case "kv":
+            fmt.Println(verman.V.KV())
+        case "banner":
+            fmt.Println(verman.V.Banner())
+        case "csv":
+            fmt.Println(verman.V.CSV())
+        case "uri":
+            fmt.Println(verman.V.URI())
         default:
             fmt.Println(verman.V.Version())
         }
@@ -156,15 +160,17 @@ type Info struct {
 | 方法名 | 返回值 | 描述 |
 |--------|--------|------|
 | `Version()` | `string` | 标准版本格式 |
-| `Simple()` | `string` | 简洁版本格式 |
+| `Short()` | `string` | 短格式 |
+| `Long()` | `string` | 长格式 |
+| `Standard()` | `string` | 标准格式 |
 | `Full()` | `string` | 完整版本格式 |
-| `Detail()` | `string` | 详细版本格式 |
-| `Complete()` | `string` | 完整信息格式 |
-| `Banner()` | `string` | 横幅格式（多行） |
+| `Lines()` | `string` | 分行格式 |
 | `Table()` | `string` | 表格格式（多行） |
-| `Build()` | `string` | 构建信息格式（多行） |
-| `Git()` | `string` | Git信息格式（多行） |
-| `JSON()` | `string` | JSON格式（多行） |
+| `JSON()` | `string` | JSON格式 |
+| `KV()` | `string` | 键值对格式 |
+| `Banner()` | `string` | 横幅格式（多行） |
+| `CSV()` | `string` | 逗号分隔格式 |
+| `URI()` | `string` | URI格式 |
 
 ## 🎨 支持的输出格式
 
@@ -173,20 +179,22 @@ type Info struct {
 | 格式 | 示例输出 | 使用场景 |
 |------|----------|----------|
 | `Version()` | `MyApp version v1.0.0 linux/amd64` | 标准版本显示 |
-| `Simple()` | `MyApp v1.0.0` | 简洁版本显示 |
-| `Full()` | `MyApp version v1.0.0 linux/amd64 (commit: abc1234)` | 包含提交信息 |
-| `Detail()` | `MyApp v1.0.0 linux/amd64 built at 2024-01-01` | 包含构建时间 |
-| `Complete()` | `MyApp v1.0.0 linux/amd64 (commit: abc1234, tree: clean, built: 2024-01-01, go: go1.21)` | 完整详细信息 |
+| `Short()` | `MyApp v1.0.0` | 短格式显示 |
+| `Long()` | `MyApp version v1.0.0 linux/amd64 with go1.22.1` | 长格式显示 |
+| `Standard()` | `MyApp v1.0.0 (abc1234) [linux/amd64]` | 标准格式显示 |
+| `Full()` | `MyApp v1.0.0 (abc1234) linux/amd64 built 2024-01-01 with go1.22.1` | 包含完整信息 |
+| `JSON()` | `{"name":"MyApp","version":"v1.0.0","commit":"abc1234","platform":"linux/amd64","buildTime":"2024-01-01T12:00:00Z","goVersion":"go1.22.1"}` | API返回或配置 |
+| `KV()` | `app=MyApp version=v1.0.0 commit=abc1234 platform=linux/amd64 build=2024-01-01 go=go1.22.1` | 键值对格式 |
+| `CSV()` | `MyApp,v1.0.0,abc1234,linux/amd64,2024-01-01,go1.22.1` | 逗号分隔格式 |
+| `URI()` | `verman://MyApp/v1.0.0?commit=abc1234&platform=linux/amd64&build=2024-01-01&go=go1.22.1` | URI格式 |
 
 ### 多行格式
 
 | 格式 | 示例输出 | 使用场景 |
 |------|----------|----------|
-| `Banner()` | `MyApp v2.1.0`<br>`Platform: linux/amd64 \| Go: go1.22.1` | 程序启动横幅 |
-| `Build()` | `MyApp v2.1.0`<br>`Built at 2024-03-15T15:00:00Z with go1.22.1` | 构建信息展示 |
-| `Git()` | `Version: v2.1.0`<br>`Commit: a1b2c3d4e5f6 (clean)`<br>`Commit Time: 2024-03-15T14:30:00Z` | Git版本控制信息 |
-| `Table()` | `Application : MyApp`<br>`Version     : v2.1.0`<br>`Platform    : linux/amd64`<br>`...` | 详细信息表格 |
-| `JSON()` | `{`<br>`  "appName": "MyApp",`<br>`  "gitVersion": "v2.1.0",`<br>`  ...`<br>`}` | API返回或配置 |
+| `Banner()` | `╔═══════════════════════════════════════╗`<br>`║           MyApp v1.0.0                ║`<br>`╠═══════════════════════════════════════╣`<br>`║ Commit:  abc1234 (clean)              ║`<br>`║ Platform: linux/amd64                 ║`<br>`║ Built:   2024-01-01 with go1.22.1     ║`<br>`╚═══════════════════════════════════════╝` | 程序启动横幅 |
+| `Lines()` | `MyApp v1.0.0`<br>`Commit: abc1234 (clean)`<br>`Platform: linux/amd64`<br>`Built: 2024-01-01 with go1.22.1` | 分行显示 |
+| `Table()` | `┌─────────────┬──────────────────┐`<br>`│ Application │ MyApp           │`<br>`│ Version     │ v1.0.0          │`<br>`│ Commit      │ abc1234         │`<br>`│ Platform    │ linux/amd64     │`<br>`│ Build Time  │ 2024-01-01      │`<br>`│ Go Version  │ go1.22.1        │`<br>`└─────────────┴──────────────────┘` | 详细信息表格 |
 
 ## ⚙️ 配置选项
 
@@ -226,60 +234,6 @@ verman/
 └── 📁 test/              # 测试项目
     ├── go.mod
     └── main.go
-```
-
-## 🧪 测试说明
-
-### 运行测试
-
-```bash
-# 运行所有测试并查看详细输出
-go test -v
-
-# 运行格式展示测试
-go test -v -run TestAllFormats
-
-# 运行基准测试
-go test -bench=. -benchmem
-
-# 查看测试覆盖率
-go test -cover
-```
-
-### 测试功能
-
-- ✅ 所有 10 种版本格式输出测试
-- ✅ 全局实例 V 功能测试
-- ✅ 默认值处理测试
-- ✅ 边界情况测试
-- ✅ 运行时信息获取测试
-- ✅ 基准性能测试
-
-### 示例测试输出
-
-```
-=== 版本信息格式展示 ===
-
-1. Simple() - 简洁格式:
-   MyAwesomeApp v2.1.0
-
-2. Version() - 标准版本格式:
-   MyAwesomeApp version v2.1.0 linux/amd64
-
-3. Banner() - 横幅格式 (多行):
-   MyAwesomeApp v2.1.0
-   Platform: linux/amd64 | Go: go1.22.1
-
-4. Table() - 表格格式 (多行):
-   Application : MyAwesomeApp
-   Version     : v2.1.0
-   Platform    : linux/amd64
-   Commit      : a1b2c3d4e5f6
-   Tree State  : clean
-   Build Time  : 2024-03-15T15:00:00Z
-   Go Version  : go1.22.1
-
-=== 测试完成 ===
 ```
 
 ## 📄 许可证

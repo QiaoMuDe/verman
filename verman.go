@@ -84,123 +84,141 @@ func (i *Info) Version() string {
 	return fmt.Sprintf("%s version %s %s", i.AppName, i.GitVersion, i.Platform)
 }
 
-// Simple 返回格式为"程序名 v1.0.0"的字符串
+// Short 返回短格式
 //
 // 示例:
 //
 //	MyApp v1.0.0
-func (i *Info) Simple() string {
+func (i *Info) Short() string {
 	return fmt.Sprintf("%s %s", i.AppName, i.GitVersion)
 }
 
-// Full 返回格式为"程序名 version 版本号 平台/架构 (commit: abc1234)"的字符串
+// Long 返回长格式
 //
 // 示例:
 //
-//	MyApp version v1.0.0 linux/amd64 (commit: abc1234)
+//	MyApp version v1.0.0 linux/amd64 with go1.22.1
+func (i *Info) Long() string {
+	return fmt.Sprintf("%s version %s %s with %s", i.AppName, i.GitVersion, i.Platform, i.GoVersion)
+}
+
+// Standard 返回标准格式
+//
+// 示例:
+//
+//	MyApp v1.0.0 (abc1234) [linux/amd64]
+func (i *Info) Standard() string {
+	return fmt.Sprintf("%s %s (%s) [%s]", i.AppName, i.GitVersion, i.GitCommit, i.Platform)
+}
+
+// Full 返回完整格式
+//
+// 示例:
+//
+//	MyApp v1.0.0 (abc1234) linux/amd64 built 2024-01-01 with go1.22.1
 func (i *Info) Full() string {
-	return fmt.Sprintf("%s version %s %s (commit: %s)", i.AppName, i.GitVersion, i.Platform, i.GitCommit)
+	return fmt.Sprintf("%s %s (%s) %s built %s with %s",
+		i.AppName, i.GitVersion, i.GitCommit, i.Platform, i.BuildTime, i.GoVersion)
 }
 
-// Detail 返回格式为"程序名 v1.0.0 linux/amd64 built at 2024-01-01"的字符串
+// Lines 返回分行格式
 //
 // 示例:
 //
-//	MyApp v1.0.0 linux/amd64 built at 2024-01-01
-func (i *Info) Detail() string {
-	return fmt.Sprintf("%s %s %s built at %s", i.AppName, i.GitVersion, i.Platform, i.BuildTime)
-}
-
-// Complete 返回包含所有信息的完整字符串
-//
-// 示例:
-//
-//	MyApp v1.0.0 linux/amd64 (commit: abc1234, tree: clean, built: 2024-01-01T12:00:00Z, go: go1.19)"
-func (i *Info) Complete() string {
-	return fmt.Sprintf("%s %s %s (commit: %s, tree: %s, built: %s, go: %s)",
-		i.AppName, i.GitVersion, i.Platform, i.GitCommit, i.GitTreeState, i.BuildTime, i.GoVersion)
-}
-
-// Banner 返回横幅格式(多行)
-//
-// 示例:
-//
-//	MyApp v2.1.0
-//	Platform: linux/amd64 | Go: go1.22.1
-func (i *Info) Banner() string {
+//	MyApp v1.0.0
+//	Commit: abc1234 (clean)
+//	Platform: linux/amd64
+//	Built: 2024-01-01 with go1.22.1
+func (i *Info) Lines() string {
 	return fmt.Sprintf(`%s %s
-Platform: %s | Go: %s`, i.AppName, i.GitVersion, i.Platform, i.GoVersion)
-}
-
-// Table 返回表格格式(多行)
-//
-// 示例:
-//
-//	Application : MyApp
-//	Version     : v2.1.0
-//	Platform    : linux/amd64
-//	Commit      : a1b2c3d4e5f6
-//	Tree State  : clean
-//	Build Time  : 2024-03-15T15:00:00Z
-//	Go Version  : go1.22.1
-func (i *Info) Table() string {
-	return fmt.Sprintf(`Application : %s
-Version     : %s
-Platform    : %s
-Commit      : %s
-Tree State  : %s
-Build Time  : %s
-Go Version  : %s`,
-		i.AppName, i.GitVersion, i.Platform, i.GitCommit, i.GitTreeState, i.BuildTime, i.GoVersion)
-}
-
-// Build 返回构建信息格式
-//
-// 示例:
-//
-//	MyApp v2.1.0
-//	Built at 2024-03-15T15:00:00Z with go1.22.1
-func (i *Info) Build() string {
-	return fmt.Sprintf("%s %s\nBuilt at %s with %s", i.AppName, i.GitVersion, i.BuildTime, i.GoVersion)
-}
-
-// Git 返回Git信息格式
-//
-// 示例:
-//
-//	Version: v2.1.0
-//	Commit: a1b2c3d4e5f6 (clean)
-//	Commit Time: 2024-03-15T14:30:00Z
-func (i *Info) Git() string {
-	return fmt.Sprintf(`Version: %s
 Commit: %s (%s)
-Commit Time: %s`,
-		i.GitVersion, i.GitCommit, i.GitTreeState, i.GitCommitTime)
+Platform: %s
+Built: %s with %s`,
+		i.AppName, i.GitVersion, i.GitCommit, i.GitTreeState, i.Platform, i.BuildTime, i.GoVersion)
+}
+
+// Table 返回表格格式
+//
+// 示例:
+//
+//	┌─────────────┬──────────────────┐
+//	│ Application │ MyApp           │
+//	│ Version     │ v1.0.0          │
+//	│ Commit      │ abc1234         │
+//	│ Platform    │ linux/amd64     │
+//	│ Build Time  │ 2024-01-01      │
+//	│ Go Version  │ go1.22.1        │
+//	└─────────────┴──────────────────┘
+func (i *Info) Table() string {
+	return fmt.Sprintf(`┌─────────────┬──────────────────┐
+│ Application │ %-16s │
+│ Version     │ %-16s │
+│ Commit      │ %-16s │
+│ Platform    │ %-16s │
+│ Build Time  │ %-16s │
+│ Go Version  │ %-16s │
+└─────────────┴──────────────────┘`,
+		i.AppName, i.GitVersion, i.GitCommit, i.Platform, i.BuildTime, i.GoVersion)
 }
 
 // JSON 返回JSON格式
 //
 // 示例:
 //
-//	 {
-//		  "appName": "MyApp",
-//		  "gitVersion": "v2.1.0",
-//		  "gitCommit": "a1b2c3d4e5f6",
-//		  "gitTreeState": "clean",
-//		  "gitCommitTime": "2024-03-15T14:30:00Z",
-//		  "buildTime": "2024-03-15T15:00:00Z",
-//		  "goVersion": "go1.22.1",
-//		  "platform": "linux/amd64"
-//	 }
+//	{"name":"MyApp","version":"v1.0.0","commit":"abc1234","platform":"linux/amd64","buildTime":"2024-01-01T12:00:00Z","goVersion":"go1.22.1"}
 func (i *Info) JSON() string {
-	return fmt.Sprintf(`{
-  "appName": "%s",
-  "gitVersion": "%s",
-  "gitCommit": "%s",
-  "gitTreeState": "%s",
-  "gitCommitTime": "%s",
-  "buildTime": "%s",
-  "goVersion": "%s",
-  "platform": "%s"
-}`, i.AppName, i.GitVersion, i.GitCommit, i.GitTreeState, i.GitCommitTime, i.BuildTime, i.GoVersion, i.Platform)
+	return fmt.Sprintf(`{"name":"%s","version":"%s","commit":"%s","platform":"%s","buildTime":"%s","goVersion":"%s"}`,
+		i.AppName, i.GitVersion, i.GitCommit, i.Platform, i.GitCommitTime, i.GoVersion)
+}
+
+// KV 返回键值对格式
+//
+// 示例:
+//
+//	app=MyApp version=v1.0.0 commit=abc1234 platform=linux/amd64 build=2024-01-01 go=go1.22.1
+func (i *Info) KV() string {
+	return fmt.Sprintf("app=%s version=%s commit=%s platform=%s build=%s go=%s",
+		i.AppName, i.GitVersion, i.GitCommit, i.Platform, i.BuildTime, i.GoVersion)
+}
+
+// Banner 返回横幅格式
+//
+// 示例:
+//
+//	╔═══════════════════════════════════════╗
+//	║           MyApp v1.0.0                ║
+//	╠═══════════════════════════════════════╣
+//	║ Commit:  abc1234 (clean)              ║
+//	║ Platform: linux/amd64                 ║
+//	║ Built:   2024-01-01 with go1.22.1     ║
+//	╚═══════════════════════════════════════╝
+func (i *Info) Banner() string {
+	return fmt.Sprintf(`╔════════════════════════════════════════════════╗
+║                %s %-23s ║
+╠════════════════════════════════════════════════╣
+║       Commit:  %-31s ║
+║       Platform: %-30s ║
+║       Built:   %-31s ║
+╚════════════════════════════════════════════════╝`,
+		i.AppName, i.GitVersion, i.GitCommit+" ("+i.GitTreeState+")", i.Platform, i.BuildTime+" with "+i.GoVersion)
+}
+
+// CSV 返回逗号分隔格式
+//
+// 示例:
+//
+//	MyApp,v1.0.0,abc1234,linux/amd64,2024-01-01,go1.22.1
+func (i *Info) CSV() string {
+	return fmt.Sprintf("%s,%s,%s,%s,%s,%s",
+		i.AppName, i.GitVersion, i.GitCommit, i.Platform, i.BuildTime, i.GoVersion)
+}
+
+// URI 返回URI格式
+//
+// 示例:
+//
+//	verman://MyApp/v1.0.0?commit=abc1234&platform=linux/amd64&build=2024-01-01&go=go1.22.1
+func (i *Info) URI() string {
+	return fmt.Sprintf("verman://%s/%s?commit=%s&platform=%s&build=%s&go=%s",
+		i.AppName, i.GitVersion, i.GitCommit, i.Platform, i.BuildTime, i.GoVersion)
 }
